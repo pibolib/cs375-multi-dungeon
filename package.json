@@ -1,0 +1,10 @@
+{
+	"dependencies": {
+		"express": "^4.21.1",
+		"socket.io": "^4.8.1"
+	},
+	"scripts": {
+		"install-deps": "npm i express socket.io",
+		"start": "cd app && node server.js"
+	}
+}
