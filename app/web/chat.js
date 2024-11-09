@@ -5,23 +5,42 @@ const messageDisplay = document.getElementById("messageDisplay");
 const messageInput = document.getElementById("message");
 const button = document.getElementById("submit");
 
+const gamestateDisplay = document.getElementById("gamestateDisplay");
+
+let gamestate = {};
+
 button.addEventListener("click", () => {
-    let message = messageInput.value;
-    ws.send(message);
-    messageInput.value = "";
+	let message = {
+		messageType: "chat",
+		messageBody: messageInput.value,
+	};
+	ws.send(JSON.stringify(message));
+	messageInput.value = "";
 });
 
 ws.addEventListener("open", () => {
-    console.log("Web socket connection opened");
+	console.log("Web socket connection opened");
 });
 
 ws.addEventListener("close", () => {
-    console.log("Web socket connection closed");
+	console.log("Web socket connection closed");
 });
 
 ws.addEventListener("message", (event) => {
-    console.log('works');
-    let newMessage = document.createElement("div");
+	let eventObject = JSON.parse(event.data);
+	if (eventObject.messageType == "chat") {
+		let newMessage = document.createElement("div");
+		newMessage.textContent = eventObject.messageBody;
+		messageDisplay.append(newMessage);
+	} else if (eventObject.messageType == "refresh") {
+		gamestate = eventObject.messageBody;
+		gamestateDisplay.textContent = JSON.stringify(gamestate);
+	} else if (eventObject.messageType == "spawn") {
+		gamestate.push(eventObject.messageBody);
+		gamestateDisplay.textContent = JSON.stringify(gamestate);
+	}
+
+	/*
     if (event.data instanceof Blob) {
         reader = new FileReader();
         reader.addEventListener("load", () => {
@@ -31,7 +50,6 @@ ws.addEventListener("message", (event) => {
         reader.readAsText(event.data);
     }
     else {
-        newMessage.textContentc = event.data;
-        messageDisplay.append(newMessage);
     }
+    */
 });
