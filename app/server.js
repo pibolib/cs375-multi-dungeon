@@ -1,13 +1,31 @@
 const ws = require("ws");
 const express = require("express");
 const http = require("http");
+const { Pool } = require("pg");
+let argon2 = require("argon2");
+let cookieParser = require("cookie-parser");
+let crypto = require("crypto");
+let env = require("../env.json");
 
+let { LoginLogout } = require("./loginLogout.js");
+
+const pool = new Pool(env);
 const app = express();
 app.use(express.json());
 app.use(express.static("web"));
+app.use(cookieParser());
 
 let port = 12789;
 let hostname = "localhost";
+
+// global object for storing tokens
+// in a real app, we'd save them to a db so even if the server exits
+// users will still be logged in when it restarts
+let tokenStorage = {};
+
+pool.connect().then(() => {
+	console.log("Connected to the database!");
+})
 
 let currentEntityIndex = 1;
 let entities = [
@@ -17,6 +35,12 @@ let entities = [
 		posY: 5,
 	},
 ];
+
+app.post("/test", (req, res) => {
+	console.log(req.body);
+});
+
+LoginLogout(app, argon2, cookieParser, crypto, pool, tokenStorage);
 
 // Create HTTP server and attach the WebSocket server to it
 const server = http.createServer(app);
