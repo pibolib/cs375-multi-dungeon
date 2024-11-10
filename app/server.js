@@ -2,15 +2,14 @@ const ws = require("ws");
 const express = require("express");
 const http = require("http");
 const { Pool } = require("pg");
-let argon2 = require("argon2");
-let cookieParser = require("cookie-parser");
-let crypto = require("crypto");
+const cookieParser = require("cookie-parser");
 let env = require("../env.json");
 
 let { LoginLogout } = require("./loginLogout.js");
 
 const pool = new Pool(env);
 const app = express();
+
 app.use(express.json());
 app.use(express.static("web"));
 app.use(cookieParser());
@@ -40,7 +39,7 @@ app.post("/test", (req, res) => {
 	console.log(req.body);
 });
 
-LoginLogout(app, argon2, cookieParser, crypto, pool, tokenStorage);
+LoginLogout(app, pool, tokenStorage);
 
 // Create HTTP server and attach the WebSocket server to it
 const server = http.createServer(app);

@@ -1,5 +1,9 @@
+const { Utils } = require("./utils.js");
+const argon2 = require("argon2");
+const crypto = require("crypto");
+
 /* returns a random 32 byte string */
-function makeToken(crypto) {
+function makeToken() {
 	return crypto.randomBytes(32).toString("hex");
 }
 
@@ -12,29 +16,85 @@ let cookieOptions = {
 	sameSite: "strict", // browser will only include this cookie on requests to this domain, not other domains; important to prevent cross-site request forgery attacks
 };
 
-function validateLogin(body) {
-    return true; 
+function validateNewCreds(body) {
+    let usernameErrors = validateUsername(body.username);
+    let passwordErrors = validatePassword(body.password);
+
+    if (usernameErrors.length == 0 && passwordErrors.length == 0) {
+        return {}
+    }
+
+    return {usernameErrors: usernameErrors, passwordErrors: passwordErrors}
 }
 
-function doesUsernameExists(username) {
-    return false;
+function validateUsername(username) {
+    let errors = [];
+
+    // length
+    if (username.length < 4 || username.length > 20) {
+        errors.push("Username should be 4 to 20 characters long");
+    }
+
+    return errors;
 }
 
-exports.LoginLogout = (app, argon2, cookieParser, crypto, pool, tokenStorage) => {
+function validatePassword(password) {
+    let errors = [];
+    const minLength = 8;
+    const maxLength = 50;
+    const hasUpperCase = /[A-Z]/;
+    const hasLowerCase = /[a-z]/;
+    const hasNumber = /[0-9]/;
+    const hasSpecialChar = /[!@#&*_]/;
+
+    // length
+    if (password.length < minLength || password.length > maxLength) {
+        errors.push("Password should be 8 to 50 characters long.");
+    }
+
+    if (!hasUpperCase.test(password)) {
+        errors.push("Password must contain at least one uppercase letter.");
+    }
+    if (!hasLowerCase.test(password)) {
+    errors.push("Password must contain at least one lowercase letter.");
+    }
+    if (!hasNumber.test(password)) {
+    errors.push("Password must contain at least one number.");
+    }
+    if (!hasSpecialChar.test(password)) {
+    errors.push("Password must contain at least one of the following special character: !@#&*_");
+    }
+
+    return errors;
+}
+
+async function usernameExists(username, pool) {
+    try {
+        let result = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+        return result.rows.length == 0;
+    }
+    catch (error) {
+        console.log("SELECT FAILED", error);
+        return true;
+    }
+}
+
+exports.LoginLogout = (app, pool, tokenStorage) => {
     app.post("/create", async (req, res) => {
         let { body } = req;
-        
-        console.log(req.body);
 
-        // validate login details
-        if (!validateLogin(body)) {
-            return res.sendStatus(400);
+        // validating the credentials
+        let credValidationErrors = validateNewCreds(body);
+        if (!Utils.isEmpty(credValidationErrors)) {
+            res.statusCode = 400;
+            return res.json({error: credValidationErrors});
         }
 
         let { username, password } = body;
         console.log(username, password);
 
-        if (doesUsernameExists(username)) {
+        // making sure that the username does not exist
+        if (usernameExists(username, pool)) {
             res.statusCode = 400;
             return res.json({"error": "Username taken! Please choose a different username."});
         }
