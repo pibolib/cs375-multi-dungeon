@@ -71,7 +71,7 @@ function validatePassword(password) {
 async function usernameExists(username, pool) {
     try {
         let result = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
-        return result.rows.length == 0;
+        return result.rows.length > 0;
     }
     catch (error) {
         console.log("SELECT FAILED", error);
@@ -80,7 +80,7 @@ async function usernameExists(username, pool) {
 }
 
 exports.LoginLogout = (app, pool, tokenStorage) => {
-    app.post("/create", async (req, res) => {
+    app.post("/register", async (req, res) => {
         let { body } = req;
 
         // validating the credentials
@@ -94,7 +94,8 @@ exports.LoginLogout = (app, pool, tokenStorage) => {
         console.log(username, password);
 
         // making sure that the username does not exist
-        if (usernameExists(username, pool)) {
+        let usernameTaken = await usernameExists(username, pool);
+        if (usernameTaken) {
             res.statusCode = 400;
             return res.json({"error": "Username taken! Please choose a different username."});
         }
