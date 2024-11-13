@@ -24,9 +24,8 @@ let tokenStorage = {};
 
 pool.connect().then(() => {
 	console.log("Connected to the database!");
-})
+});
 
-let currentEntityIndex = 1;
 let entities = [
 	{
 		entityType: "dummy",
@@ -34,6 +33,10 @@ let entities = [
 		posY: 5,
 	},
 ];
+
+let updateEvents = [];
+
+let clients = {};
 
 app.post("/test", (req, res) => {
 	console.log(req.body);
@@ -65,11 +68,35 @@ wss.on("connection", (client) => {
 		messageType: "spawn",
 		messageBody: newEntity,
 	};
+	clients[client] = { id: entities.length, action: "none" };
 	entities.push(newEntity);
-	broadcast(JSON.stringify(newEntityMessage));
+	updateEvents.push(JSON.stringify(newEntityMessage));
+
 	client.on("message", (message) => {
+		let messageObject = JSON.parse(message);
 		console.log(`New message: ${message}`);
-		broadcast(message);
+		if (messageObject.messageType == "chat") {
+			broadcast(message);
+		} else if (messageObject.messageType == "moveLeft") {
+			clients[client].action = "moveLeft";
+		} else if (messageObject.messageType == "moveRight") {
+			clients[client].action = "moveRight";
+		} else if (messageObject.messageType == "moveUp") {
+			clients[client].action = "moveUp";
+		} else if (messageObject.messageType == "moveDown") {
+			clients[client].action = "moveDown";
+		}
+	});
+	client.on("close", (client) => {
+		let despawnMessage = {
+			messageType: "despawn",
+			messageBody: clients[client],
+		};
+		updateEvents.push(JSON.stringify(despawnMessage));
+		entities[clients[client].id] = {
+			entityType: "none",
+		};
+		clients[client] = { id: -1, action: "none" };
 	});
 });
 
@@ -81,3 +108,47 @@ function broadcast(message) {
 		}
 	}
 }
+
+function handleCycle() {
+	for (let i = 0; i < clients.length; i++) {
+		if (clients[i].id == -1) {
+			continue;
+		}
+		let didAction = false;
+		switch (clients[i].action) {
+			case "moveLeft":
+				entities[clients[i].id].posX -= 1;
+				didAction = true;
+				break;
+			case "moveRight":
+				entities[clients[i].id].posX += 1;
+				didAction = true;
+				break;
+			case "moveUp":
+				entities[clients[i].id].posY -= 1;
+				didAction = true;
+				break;
+			case "moveDown":
+				entities[clients[i].id].posY += 1;
+				didAction = true;
+				break;
+		}
+		clients[i].action = "none";
+		if (didAction) {
+			let actionEvent = {
+				messageType: "updateStatus",
+				messageBody: {
+					actor: i,
+					newState: entities[clients[i].id],
+				},
+			};
+			updateEvents.push(JSON.stringify(actionEvent));
+		}
+	}
+	for (let i = 0; i < updateEvents.length; i++) {
+		broadcast(updateEvents[i]);
+	}
+	updateEvents = [];
+}
+
+setInterval(handleCycle, 1000);

@@ -38,6 +38,11 @@ ws.addEventListener("message", (event) => {
 	} else if (eventObject.messageType == "spawn") {
 		gamestate.push(eventObject.messageBody);
 		gamestateDisplay.textContent = JSON.stringify(gamestate);
+	} else if (eventObject.messageType == "despawn") {
+		gamestate[eventObject.messageBody] = {
+			entityType: "none",
+		};
+		gamestateDisplay.textContent = JSON.stringify(gamestate);
 	}
 
 	/*
