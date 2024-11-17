@@ -23,23 +23,26 @@ let hostname = "localhost";
 let tokenStorage = {};
 
 pool.connect().then(() => {
-	console.log("Connected to the database!");
+    console.log("Connected to the database!");
 });
 
+// Entities in the game world
 let entities = [
-	{
-		entityType: "dummy",
-		posX: 4,
-		posY: 5,
-	},
+    {
+        entityType: "dummy",
+        posX: 4,
+        posY: 5,
+    },
 ];
 
+// Queue of update events
 let updateEvents = [];
 
-let clients = {};
+// Clients map
+let clients = new Map();
 
 app.post("/test", (req, res) => {
-	console.log(req.body);
+    console.log(req.body);
 });
 
 LoginLogout(app, pool, tokenStorage);
@@ -47,108 +50,136 @@ LoginLogout(app, pool, tokenStorage);
 // Create HTTP server and attach the WebSocket server to it
 const server = http.createServer(app);
 server.listen(port, hostname, () => {
-	console.log(`Server running on http://${hostname}:${port}`);
+    console.log(`Server running on http://${hostname}:${port}`);
 });
 
 // Set up the WebSocket server
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (client) => {
-	console.log("New client connected!");
-	let clientUpdateMessage = {
-		messageType: "refresh",
-		messageBody: entities,
-	};
-	client.send(JSON.stringify(clientUpdateMessage));
-	let newEntity = {
-		entityType: "player",
-		posX: Math.floor(Math.random() * 8),
-		posY: Math.floor(Math.random() * 8),
-	};
-	let newEntityMessage = {
-		messageType: "spawn",
-		messageBody: newEntity,
-	};
-	clients[client] = { id: entities.length, action: "none" };
-	entities.push(newEntity);
-	updateEvents.push(JSON.stringify(newEntityMessage));
+    console.log("New client connected!");
 
-	client.on("message", (message) => {
-		let messageObject = JSON.parse(message);
-		console.log(`New message: ${message}`);
-		if (messageObject.messageType == "chat") {
-			broadcast(message);
-		} else if (messageObject.messageType == "moveLeft") {
-			clients[client].action = "moveLeft";
-		} else if (messageObject.messageType == "moveRight") {
-			clients[client].action = "moveRight";
-		} else if (messageObject.messageType == "moveUp") {
-			clients[client].action = "moveUp";
-		} else if (messageObject.messageType == "moveDown") {
-			clients[client].action = "moveDown";
-		}
-	});
-	client.on("close", (client) => {
-		let despawnMessage = {
-			messageType: "despawn",
-			messageBody: clients[client],
-		};
-		updateEvents.push(JSON.stringify(despawnMessage));
-		entities[clients[client].id] = {
-			entityType: "none",
-		};
-		clients[client] = { id: -1, action: "none" };
-	});
+    // Send current entities to the new client
+    let clientUpdateMessage = {
+        messageType: "refresh",
+        messageBody: entities,
+    };
+    client.send(JSON.stringify(clientUpdateMessage));
+
+    // Create a new entity for the player
+    let newEntity = {
+        entityType: "player",
+        posX: Math.floor(Math.random() * 8),
+        posY: Math.floor(Math.random() * 8),
+    };
+    let newEntityMessage = {
+        messageType: "spawn",
+        messageBody: newEntity,
+    };
+	clients.set(client, { id: entities.length, action: "none" });
+	entities.push(newEntity);
+
+    updateEvents.push(JSON.stringify(newEntityMessage));
+
+    // Handle messages from the client
+    client.on("message", (message) => {
+        try {
+            let messageObject = JSON.parse(message);
+            console.log(`New message: ${message}`);
+            let clientData = clients.get(client);
+
+            if (messageObject.messageType == "chat") {
+                broadcast(message);
+            } else if (clientData) {
+                switch (messageObject.messageType) {
+                    case "moveLeft":
+                        clientData.action = "moveLeft";
+                        break;
+                    case "moveRight":
+                        clientData.action = "moveRight";
+                        break;
+                    case "moveUp":
+                        clientData.action = "moveUp";
+                        break;
+                    case "moveDown":
+                        clientData.action = "moveDown";
+                        break;
+                }
+            }
+        } catch (error) {
+            console.error("Error processing message:", error);
+        }
+    });
+
+    client.on("close", () => {
+        let clientData = clients.get(client);
+
+        if (clientData) {
+            let despawnMessage = {
+                messageType: "despawn",
+                messageBody: { id: clientData.id },
+            };
+
+            updateEvents.push(JSON.stringify(despawnMessage));
+            entities[clientData.id] = { 
+				entityType: "none", 
+			};
+            clients.delete(client);
+        }
+    });
 });
 
 // Sends message to every client that is currently active
 function broadcast(message) {
-	for (let client of wss.clients) {
-		if (client.readyState === ws.OPEN) {
-			client.send(message);
-		}
-	}
+    for (let client of wss.clients) {
+        if (client.readyState === ws.OPEN) {
+            client.send(message);
+        }
+    }
 }
 
 function handleCycle() {
-	for (let i = 0; i < clients.length; i++) {
-		if (clients[i].id == -1) {
-			continue;
-		}
-		let didAction = false;
-		switch (clients[i].action) {
-			case "moveLeft":
-				entities[clients[i].id].posX -= 1;
-				didAction = true;
-				break;
-			case "moveRight":
-				entities[clients[i].id].posX += 1;
-				didAction = true;
-				break;
-			case "moveUp":
-				entities[clients[i].id].posY -= 1;
-				didAction = true;
-				break;
-			case "moveDown":
-				entities[clients[i].id].posY += 1;
-				didAction = true;
-				break;
-		}
-		clients[i].action = "none";
-		if (didAction) {
-			let actionEvent = {
-				messageType: "updateStatus",
-				messageBody: {
-					actor: i,
-					newState: entities[clients[i].id],
-				},
-			};
-			updateEvents.push(JSON.stringify(actionEvent));
-		}
-	}
-	for (let i = 0; i < updateEvents.length; i++) {
+    for (let [client, clientData] of clients.entries()) {
+        if (clientData.id === -1) {
+            continue;
+        }
+
+        let entity = entities[clientData.id];
+        let didAction = false;
+
+        switch (clientData.action) {
+            case "moveLeft":
+                entity.posX -= 1;
+                didAction = true;
+                break;
+            case "moveRight":
+                entity.posX += 1;
+                didAction = true;
+                break;
+            case "moveUp":
+                entity.posY -= 1;
+                didAction = true;
+                break;
+            case "moveDown":
+                entity.posY += 1;
+                didAction = true;
+                break;
+        }
+        clientData.action = "none";
+        if (didAction) {
+            let actionEvent = {
+                messageType: "updateStatus",
+                messageBody: {
+                    actor: clientData.id,
+                    newState: entity,
+                },
+            };
+            updateEvents.push(JSON.stringify(actionEvent));
+        }
+    }
+    for (let i = 0; i < updateEvents.length; i++) {
 		broadcast(updateEvents[i]);
 	}
-	updateEvents = [];
+    updateEvents = [];
 }
 
 setInterval(handleCycle, 1000);
