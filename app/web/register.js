@@ -4,7 +4,8 @@ let submitButton = document.getElementById("submit");
 let errorMessage = document.getElementById("errorMessage");
 let successMessage = document.getElementById("successMessage");
 
-submitButton.addEventListener("click", () => {
+submitButton.addEventListener("click", (event) => {
+    event.preventDefault();
     var request = fetch('/register', {
         method: "POST",
         headers: {
