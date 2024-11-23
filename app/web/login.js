@@ -4,28 +4,28 @@ let submitButton = document.getElementById("submit");
 let errorMessage = document.getElementById("errorMessage");
 let successMessage = document.getElementById("successMessage");
 
-submitButton.addEventListener("click", (event) => {
+submitButton.addEventListener("click", async (event) => {
     event.preventDefault();
-    var request = fetch('/login', {
-        method: "POST",
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
-    });
+    errorMessage.textContent = "";
+    successMessage.textContent = "";
 
-    // making sure that request was successful
-    request.then(async (response) => {
-        successMessage.textContent = "";
-        errorMessage.textContent = "";
+    try {
+        let response = await fetch('/login', {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username: usernameInput.value, password: passwordInput.value })
+        });
 
-        let body = await response.json();
         if (response.status >= 400) {
+            let body = await response.json();
             errorMessage.textContent = body.error;
+        } else {
+            successMessage.textContent = "Login successful!";
         }
-
-        else {
-            successMessage.textMessage = "Login successful";
-        }
-    })
+    } catch (error) {
+        errorMessage.textContent = "Something went wrong. Please try again later.";
+        console.error("Login Error:", error);
+    }
 });
