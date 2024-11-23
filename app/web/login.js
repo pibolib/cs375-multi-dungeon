@@ -23,6 +23,7 @@ submitButton.addEventListener("click", async (event) => {
             errorMessage.textContent = body.error;
         } else {
             successMessage.textContent = "Login successful!";
+            window.location.replace("/game.html");
         }
     } catch (error) {
         errorMessage.textContent = "Something went wrong. Please try again later.";

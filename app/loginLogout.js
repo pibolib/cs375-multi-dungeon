@@ -79,7 +79,38 @@ async function usernameExists(username, pool) {
     }
 }
 
+function redirectIfAuthenticated(req, res, tokenStorage) {
+    let authToken = req.cookies.authToken;
+    if (authToken) {
+        return res.redirect("/game.html");
+    }
+    return null;
+}
+
 exports.LoginLogout = (app, pool, tokenStorage) => {
+
+    // overriding the default get handling for login.html and register.html
+    // making sure that the user only sees these pages if they are not logged in
+
+    app.get("/login.html", (req, res) => {
+        console.log(req.cookies);
+        if (redirectIfAuthenticated(req, res, tokenStorage)) {
+            return;
+        }
+
+        return res.sendFile(__dirname + "/web/login.html");
+    });
+
+    app.get("/register.html", (req, res) => {
+        console.log("register");
+        console.log(req.cookies);
+        if (redirectIfAuthenticated(req, res, tokenStorage)) {
+            return;
+        }
+
+        return res.sendFile(__dirname + "/web/register.html");
+    });
+
     app.post("/register", async (req, res) => {
         let { body } = req;
 
@@ -176,7 +207,7 @@ exports.LoginLogout = (app, pool, tokenStorage) => {
 
         let token = makeToken(crypto);
         tokenStorage[token] = username;
-        return res.cookie("token", token, cookieOptions).send();
+        return res.cookie("authToken", token, cookieOptions).send();
     });
 
     app.post("/logout", (req, res) => {
@@ -196,6 +227,6 @@ exports.LoginLogout = (app, pool, tokenStorage) => {
         delete tokenStorage[token];
         console.log("Deleted", tokenStorage);
       
-        return res.clearCookie("token", cookieOptions).send();
+        return res.clearCookie("authToken", cookieOptions).send();
     });
 }

@@ -11,7 +11,6 @@ const pool = new Pool(env);
 const app = express();
 
 app.use(express.json());
-app.use(express.static("web"));
 app.use(cookieParser());
 
 let port = 12789;
@@ -41,11 +40,17 @@ app.post("/test", (req, res) => {
 
 LoginLogout(app, pool, tokenStorage);
 
+// moved this below all the other route matching so that our predefined routes for files takes precedence over directly serving those files
+// we need to have such override to add middleware authentication that only shows login and registration page when the user is not logged in already
+app.use(express.static("web"));
+
 // Create HTTP server and attach the WebSocket server to it
 const server = http.createServer(app);
 server.listen(port, hostname, () => {
 	console.log(`Server running on http://${hostname}:${port}`);
 });
+
+
 
 // Set up the WebSocket server
 const wss = new ws.WebSocketServer({ server });
