@@ -81,7 +81,7 @@ async function usernameExists(username, pool) {
 
 function redirectIfAuthenticated(req, res, tokenStorage) {
     let authToken = req.cookies.authToken;
-    if (authToken) {
+    if (authToken && tokenStorage[authToken]) {
         return res.redirect("/game.html");
     }
     return null;
