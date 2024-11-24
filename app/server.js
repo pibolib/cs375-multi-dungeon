@@ -3,6 +3,7 @@ const express = require("express");
 const http = require("http");
 const { Pool } = require("pg");
 const cookieParser = require("cookie-parser");
+const { Utils } = require("./utils.js");
 let env = require("../env.json");
 
 let { LoginLogout } = require("./loginLogout.js");
@@ -37,6 +38,14 @@ let clients = new Map();
 // redirecting users to login.html as the base landing page
 app.get("/", (req, res) => {
 	return res.sendFile(__dirname + "/web/login.html");
+});
+
+app.get("/game.html", (req, res) => {
+	if (!Utils.isAuthenticated(req, res, tokenStorage)) {
+		return res.sendFile(__dirname + "/web/login.html");
+	}
+
+	return res.sendFile(__dirname + "/web/game.html");
 });
 
 LoginLogout(app, pool, tokenStorage);
@@ -93,7 +102,6 @@ wss.on("connection", (client, req) => {
 	client.on("message", (message) => {
 		try {
 			let messageObject = JSON.parse(message);
-			console.log(`New message: ${message}`);
 			let clientData = clients.get(client);
 
 			if (messageObject.messageType == "chat") {
