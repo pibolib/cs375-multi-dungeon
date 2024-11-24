@@ -1,5 +1,5 @@
 const ws = new WebSocket(`ws://${window.document.location.host}`);
-let players = [];
+let players = new Map();
 const app = new PIXI.Application();
 
 app.init({
@@ -42,25 +42,25 @@ function setUp() {
 		if (message != null) {
 			updateGame(message);
 		}
-		console.log("Message received:", message);
 	});
 }
 
 function updateGame(message) {
+	console.log("message:", message);
+	console.log("players:", players);
 	switch (message.messageType) {
 		case "spawn":
-			console.log("Spawning player:", message.messageBody);
 			createPlayer(message.messageBody);
 			break;
 		case "updateStatus":
-			players[message.messageBody.actor].x =
+			players.get(message.messageBody.actor).x =
 				message.messageBody.newState.posX * 50;
-			players[message.messageBody.actor].y =
+			players.get(message.messageBody.actor).y =
 				message.messageBody.newState.posY * 50;
 			break;
 		case "refresh":
 			app.stage.removeChildren();
-			players = [];
+			players = new Map();
 			for (let newEntity of message.messageBody) {
 				createPlayer(newEntity);
 			}
@@ -71,13 +71,12 @@ function updateGame(message) {
 
 async function createPlayer(messageBody) {
 	if (messageBody.entityType === "player") {
-		console.log("yes");
 		let texture = await PIXI.Assets.load("assets/bunny.png");
 		let sprite = new PIXI.Sprite(texture);
 		sprite.anchor.set(0.5);
 		sprite.x = messageBody.posX * 50;
 		sprite.y = messageBody.posY * 50;
 		app.stage.addChild(sprite);
-		players.push(sprite);
+		players.set(messageBody.id, sprite);
 	}
 }

@@ -26,7 +26,7 @@ pool.connect().then(() => {
 });
 
 // Entities in the game world
-let entities = [];
+let entities = new Map();
 
 // Queue of update events
 let updateEvents = [];
@@ -34,13 +34,14 @@ let updateEvents = [];
 // Clients map
 let clients = new Map();
 
-app.post("/test", (req, res) => {
-	console.log(req.body);
+// redirecting users to login.html as the base landing page
+app.get("/", (req, res) => {
+	return res.sendFile(__dirname + "/web/login.html");
 });
 
 LoginLogout(app, pool, tokenStorage);
 
-// moved this below all the other route matching so that our predefined routes for files takes precedence over directly serving those files
+// moved this below all the other route matching so that our predefined routes for files takes precedence
 // we need to have such override to add middleware authentication that only shows login and registration page when the user is not logged in already
 app.use(express.static("web"));
 
@@ -50,17 +51,17 @@ server.listen(port, hostname, () => {
 	console.log(`Server running on http://${hostname}:${port}`);
 });
 
-
-
 // Set up the WebSocket server
 const wss = new ws.WebSocketServer({ server });
-wss.on("connection", (client) => {
+wss.on("connection", (client, req) => {
 	console.log("New client connected!");
+	let authToken = req.headers.cookie?.split(";").find((data) => data.startsWith("authToken="))?.split("=")[1];
+	let username = tokenStorage[authToken];
 
 	// Send current entities to the new client
 	let clientUpdateMessage = {
 		messageType: "refresh",
-		messageBody: entities,
+		messageBody: Array.from(entities.values()), // Convert Map values to array
 	};
 	client.send(JSON.stringify(clientUpdateMessage));
 
@@ -69,13 +70,14 @@ wss.on("connection", (client) => {
 		entityType: "player",
 		posX: Math.floor(Math.random() * 8),
 		posY: Math.floor(Math.random() * 8),
+		id: username // Use the username as the id
 	};
 	let newEntityMessage = {
 		messageType: "spawn",
 		messageBody: newEntity,
 	};
-	clients.set(client, { id: entities.length, action: "none" });
-	entities.push(newEntity);
+	clients.set(client, { id: username, action: "none" });
+	entities.set(username, newEntity); // Add new entity to the Map
 
 	updateEvents.push(JSON.stringify(newEntityMessage));
 
@@ -120,10 +122,7 @@ wss.on("connection", (client) => {
 			};
 
 			updateEvents.push(JSON.stringify(despawnMessage));
-			entities[clientData.id] = {
-				entityType: "none",
-			};
-			clients.delete(client);
+			 entities.delete(clientData.id); // Remove entity from the Map
 		}
 	});
 });
@@ -138,12 +137,12 @@ function broadcast(message) {
 }
 
 function handleCycle() {
-	for (let [client, clientData] of clients.entries()) {
-		if (clientData.id === -1) {
+	for (let [, clientData] of clients.entries()) {
+		if (!clientData || !entities.has(clientData.id)) {
 			continue;
 		}
-
-		let entity = entities[clientData.id];
+		
+		let entity = entities.get(clientData.id);
 		let didAction = false;
 
 		switch (clientData.action) {
