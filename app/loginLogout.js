@@ -79,14 +79,6 @@ async function usernameExists(username, pool) {
     }
 }
 
-function redirectIfAuthenticated(req, res, tokenStorage) {
-    let authToken = req.cookies.authToken;
-    if (authToken && tokenStorage[authToken]) {
-        return res.redirect("/game.html");
-    }
-    return null;
-}
-
 exports.LoginLogout = (app, pool, tokenStorage) => {
 
     // overriding the default get handling for login.html and register.html
@@ -94,7 +86,7 @@ exports.LoginLogout = (app, pool, tokenStorage) => {
 
     app.get("/login.html", (req, res) => {
         console.log(req.cookies);
-        if (redirectIfAuthenticated(req, res, tokenStorage)) {
+        if (Utils.redirectIfAuthenticated(req, res, tokenStorage, "/game.html")) {
             return;
         }
 
@@ -104,7 +96,7 @@ exports.LoginLogout = (app, pool, tokenStorage) => {
     app.get("/register.html", (req, res) => {
         console.log("register");
         console.log(req.cookies);
-        if (redirectIfAuthenticated(req, res, tokenStorage)) {
+        if (Utils.redirectIfAuthenticated(req, res, tokenStorage, "/game.html")) {
             return;
         }
 
