@@ -72,11 +72,16 @@ function updateGame(message) {
 async function createPlayer(messageBody) {
 	if (messageBody.entityType === "player") {
 		let texture = await PIXI.Assets.load("assets/bunny.png");
-		let sprite = new PIXI.Sprite(texture);
-		sprite.anchor.set(0.5);
+		let sprite = players.get(messageBody.id);
+
+		if (!sprite) {
+			sprite = new PIXI.Sprite(texture);
+			sprite.anchor.set(0.5);
+			app.stage.addChild(sprite);
+		}
+
 		sprite.x = messageBody.posX * 50;
 		sprite.y = messageBody.posY * 50;
-		app.stage.addChild(sprite);
 		players.set(messageBody.id, sprite);
 	}
 }

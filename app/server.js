@@ -65,21 +65,29 @@ wss.on("connection", (client, req) => {
 	};
 	client.send(JSON.stringify(clientUpdateMessage));
 
-	// Create a new entity for the player
-	let newEntity = {
-		entityType: "player",
-		posX: Math.floor(Math.random() * 8),
-		posY: Math.floor(Math.random() * 8),
-		id: username // Use the username as the id
-	};
-	let newEntityMessage = {
-		messageType: "spawn",
-		messageBody: newEntity,
-	};
-	clients.set(client, { id: username, action: "none" });
-	entities.set(username, newEntity); // Add new entity to the Map
+	// Check if the player already exists
+	if (entities.has(username)) {
+		// Update the existing entity
+		let existingEntity = entities.get(username);
+		existingEntity.client = client;
+		clients.set(client, { id: username, action: "none" });
+	} else {
+		// Create a new entity for the player
+		let newEntity = {
+			entityType: "player",
+			posX: Math.floor(Math.random() * 8),
+			posY: Math.floor(Math.random() * 8),
+			id: username // Use the username as the id
+		};
+		let newEntityMessage = {
+			messageType: "spawn",
+			messageBody: newEntity,
+		};
+		clients.set(client, { id: username, action: "none" });
+		entities.set(username, newEntity); // Add new entity to the Map
 
-	updateEvents.push(JSON.stringify(newEntityMessage));
+		updateEvents.push(JSON.stringify(newEntityMessage));
+	}
 
 	// Handle messages from the client
 	client.on("message", (message) => {
