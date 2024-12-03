@@ -105,7 +105,13 @@ wss.on("connection", (client, req) => {
 			let clientData = clients.get(client);
 
 			if (messageObject.messageType == "chat") {
-				broadcast(message);
+				// adding client id
+				let messageText = messageObject.messageBody;
+			    messageObject.messageBody = {
+					id: clientData.id,
+					text: messageText
+				};
+				broadcast(JSON.stringify(messageObject));
 			} else if (clientData) {
 				switch (messageObject.messageType) {
 					case "moveLeft":
@@ -145,6 +151,7 @@ wss.on("connection", (client, req) => {
 
 // Sends message to every client that is currently active
 function broadcast(message) {
+	console.log("Broadcasting message:", message);
 	for (let client of wss.clients) {
 		if (client.readyState === ws.OPEN) {
 			client.send(message);
@@ -197,4 +204,4 @@ function handleCycle() {
 	updateEvents = [];
 }
 
-setInterval(handleCycle, 1000);
+setInterval(handleCycle, 100);

@@ -2,13 +2,24 @@ const ws = new WebSocket(`ws://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
+
+// Chat attributes
+const messageDisplay = document.getElementById("messageDisplay");
+const messageInput = document.getElementById("message");
+const button = document.getElementById("submit");
+
 app.init({
 	backgroundColor: "#1099bb",
-	width: 500,
-	height: 500,
+	width: window.innerWidth,
+	height: window.innerHeight,
 }).then(() => {
 	document.body.appendChild(app.view);
 	setUp();
+});
+
+// making sure that game resizes with screen
+window.addEventListener("resize", () => {
+	app.renderer.resize(window.innerWidth, window.innerHeight);
 });
 
 function setUp() {
@@ -38,17 +49,32 @@ function setUp() {
 	});
 
 	ws.addEventListener("message", (event) => {
+		console.log(event);
 		let message = JSON.parse(event.data);
 		if (message != null) {
 			updateGame(message);
 		}
 	});
+
+	// Chat
+    button.addEventListener("click", (event) => {
+		event.preventDefault();
+        let message = {
+            messageType: "chat",
+            messageBody: messageInput.value,
+        };
+        ws.send(JSON.stringify(message));
+        messageInput.value = "";
+    });
 }
 
 function updateGame(message) {
-	console.log("message:", message);
-	console.log("players:", players);
 	switch (message.messageType) {
+		case "chat":
+			let newMessage = document.createElement("div");
+			let messageText = message.messageBody.id + ": " + message.messageBody.text;
+            newMessage.textContent = messageText;
+            messageDisplay.append(newMessage);
 		case "spawn":
 			createPlayer(message.messageBody);
 			break;
