@@ -2,7 +2,6 @@ const ws = new WebSocket(`ws://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
-
 // Chat attributes
 const messageDisplay = document.getElementById("messageDisplay");
 const messageInput = document.getElementById("message");
@@ -57,24 +56,25 @@ function setUp() {
 	});
 
 	// Chat
-    button.addEventListener("click", (event) => {
+	button.addEventListener("click", (event) => {
 		event.preventDefault();
-        let message = {
-            messageType: "chat",
-            messageBody: messageInput.value,
-        };
-        ws.send(JSON.stringify(message));
-        messageInput.value = "";
-    });
+		let message = {
+			messageType: "chat",
+			messageBody: messageInput.value,
+		};
+		ws.send(JSON.stringify(message));
+		messageInput.value = "";
+	});
 }
 
 function updateGame(message) {
 	switch (message.messageType) {
 		case "chat":
 			let newMessage = document.createElement("div");
-			let messageText = message.messageBody.id + ": " + message.messageBody.text;
-            newMessage.textContent = messageText;
-            messageDisplay.append(newMessage);
+			let messageText =
+				message.messageBody.id + ": " + message.messageBody.text;
+			newMessage.textContent = messageText;
+			messageDisplay.append(newMessage);
 		case "spawn":
 			createPlayer(message.messageBody);
 			break;
@@ -83,6 +83,7 @@ function updateGame(message) {
 				message.messageBody.newState.posX * 50;
 			players.get(message.messageBody.actor).y =
 				message.messageBody.newState.posY * 50;
+			// display the new information???
 			break;
 		case "refresh":
 			app.stage.removeChildren();
