@@ -91,7 +91,8 @@ function updateGame(message) {
 			for (let newEntity of message.messageBody) {
 				createPlayer(newEntity);
 			}
-
+		case "despawn":
+			players.delete(message.messageBody);
 		// TODO!
 	}
 }

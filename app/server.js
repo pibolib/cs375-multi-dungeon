@@ -179,10 +179,20 @@ function handleCycle() {
 
 		switch (clientData.action) {
 			case "moveLeft":
-				if (entityAtPosition(x - 1, y, clientData.id)) {
+				if (
+					entityAtPosition(
+						entity.posX - 1,
+						entity.posY,
+						clientData.id
+					)
+				) {
 					damageEntity(
 						clientData.id,
-						entityAtPosition(x - 1, y, clientData.id)
+						entityAtPosition(
+							entity.posX - 1,
+							entity.posY,
+							clientData.id
+						)
 					);
 				} else {
 					entity.posX -= 1;
@@ -190,10 +200,20 @@ function handleCycle() {
 				didAction = true;
 				break;
 			case "moveRight":
-				if (entityAtPosition(x + 1, y, clientData.id)) {
+				if (
+					entityAtPosition(
+						entity.posX + 1,
+						entity.posY,
+						clientData.id
+					)
+				) {
 					damageEntity(
 						clientData.id,
-						entityAtPosition(x + 1, y, clientData.id)
+						entityAtPosition(
+							entity.posX + 1,
+							entity.posY,
+							clientData.id
+						)
 					);
 				} else {
 					entity.posX += 1;
@@ -201,10 +221,20 @@ function handleCycle() {
 				didAction = true;
 				break;
 			case "moveUp":
-				if (entityAtPosition(x, y - 1, clientData.id)) {
+				if (
+					entityAtPosition(
+						entity.posX,
+						entity.posY - 1,
+						clientData.id
+					)
+				) {
 					damageEntity(
 						clientData.id,
-						entityAtPosition(x, y - 1, clientData.id)
+						entityAtPosition(
+							entity.posX,
+							entity.posY - 1,
+							clientData.id
+						)
 					);
 				} else {
 					entity.posY -= 1;
@@ -212,10 +242,20 @@ function handleCycle() {
 				didAction = true;
 				break;
 			case "moveDown":
-				if (entityAtPosition(x, y + 1, clientData.id)) {
+				if (
+					entityAtPosition(
+						entity.posX,
+						entity.posY + 1,
+						clientData.id
+					)
+				) {
 					damageEntity(
 						clientData.id,
-						entityAtPosition(x, y + 1, clientData.id)
+						entityAtPosition(
+							entity.posX,
+							entity.posY + 1,
+							clientData.id
+						)
 					);
 				} else {
 					entity.posY += 1;
@@ -246,7 +286,7 @@ function entityAtPosition(x, y, callerId) {
 		if (entity[0] == callerId) {
 			continue;
 		}
-		if (entity[1].x != x || entity[1].y != y) {
+		if (entity[1].posX != x || entity[1].posY != y) {
 			continue;
 		}
 		return entity[0];
@@ -259,39 +299,60 @@ function damageEntity(callerId, targetId) {
 	let target = entities.get(targetId);
 	target.hp -= caller.str;
 	caller.xp += caller.str;
-	if (target.hp <= 0) {
-		let despawnMessage = {
-			messageType: "despawn",
-			messageBody: { id: target },
-		};
-
-		updateEvents.push(JSON.stringify(despawnMessage));
-		entities.delete(targetId); // Remove entity from the Map
-	} else {
-		let updateEvent = {
-			messageType: "updateStatus",
+	broadcast(
+		JSON.stringify({
+			messageType: "chat",
 			messageBody: {
-				actor: targetId,
-				newState: target,
+				id: "Server",
+				text: `${callerId} deals ${caller.str} damage to ${targetId}!`,
 			},
-		};
-		updateEvents.push(JSON.stringify(updateEvent));
+		})
+	);
+	if (target.hp <= 0) {
+		target.posX = Math.floor(Math.random() * 8);
+		target.posY = Math.floor(Math.random() * 8);
+		target.hp = target.mhp;
+		broadcast(
+			JSON.stringify({
+				messageType: "chat",
+				messageBody: { id: "Server", text: `${targetId} has died!` },
+			})
+		);
 	}
+	let updateEvent = {
+		messageType: "updateStatus",
+		messageBody: {
+			actor: targetId,
+			newState: target,
+		},
+	};
+	updateEvents.push(JSON.stringify(updateEvent));
 	if (caller.xp >= caller.mxp) {
+		broadcast(
+			JSON.stringify({
+				messageType: "chat",
+				messageBody: {
+					id: "Server",
+					text: `${callerId} levels up! (${caller.lvl} -> ${
+						caller.lvl + 1
+					})`,
+				},
+			})
+		);
 		caller.xp -= caller.mxp;
-		caller.mxp = floor(caller.mxp * 1.2);
+		caller.mxp = Math.floor(caller.mxp * 1.2);
 		caller.str += 1;
 		caller.lvl += 1;
 		caller.mhp += 2;
 		caller.hp = caller.mhp;
-		let updateEvent = {
+		let updateEventCaller = {
 			messageType: "updateStatus",
 			messageBody: {
 				actor: callerId,
 				newState: caller,
 			},
 		};
-		updateEvents.push(JSON.stringify(updateEvent));
+		updateEvents.push(JSON.stringify(updateEventCaller));
 	}
 }
 
