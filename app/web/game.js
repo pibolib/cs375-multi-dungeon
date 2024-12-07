@@ -11,9 +11,9 @@ app.init({
 	backgroundColor: "#1099bb",
 	width: window.innerWidth,
 	height: window.innerHeight,
-}).then(() => {
+}).then(async () => {
 	document.body.appendChild(app.view);
-	setUp();
+	await setUp();
 });
 
 // making sure that game resizes with screen
@@ -21,7 +21,14 @@ window.addEventListener("resize", () => {
 	app.renderer.resize(window.innerWidth, window.innerHeight);
 });
 
-function setUp() {
+async function setUp() {
+	// adding tiles
+	// const tileTexture = await PIXI.Assets.load("assets/dungeon_tile.png");
+	// tileTexture.zIndex = 0;
+	// const tilingSprite = new PIXI.TilingSprite(tileTexture, app.screen.width, app.screen.height);
+	// tilingSprite.zIndex = 0;
+	// app.stage.addChild(tilingSprite);
+
 	// Sending an update to the server when an arrow key is pressed
 	document.addEventListener("keydown", (event) => {
 		const key = event.key;
@@ -48,9 +55,9 @@ function setUp() {
 	});
 
 	ws.addEventListener("message", (event) => {
-		console.log(event);
 		let message = JSON.parse(event.data);
 		if (message != null) {
+			console.log(message);
 			updateGame(message);
 		}
 	});
@@ -79,18 +86,27 @@ function updateGame(message) {
 			createPlayer(message.messageBody);
 			break;
 		case "updateStatus":
-			players.get(message.messageBody.actor).x =
-				message.messageBody.newState.posX * 50;
-			players.get(message.messageBody.actor).y =
-				message.messageBody.newState.posY * 50;
-			// display the new information???
+			let player = players.get(message.messageBody.actor);
+			let newState = message.messageBody.newState;
+			if (player != null) {
+				player.x = newState.posX * 50;
+				player.y = newState.posY * 50;
+		
+				// updating the health bar
+				let healthBarPercentage = newState.hp / newState.mhp;
+				player.healthBar.width = 50 * healthBarPercentage;
+			}
 			break;
 		case "refresh":
-			app.stage.removeChildren();
-			players = new Map();
+			// Only remove player sprites, not the background
+			players.forEach((player) => {
+				app.stage.removeChild(player);
+			});
+			players.clear();
 			for (let newEntity of message.messageBody) {
 				createPlayer(newEntity);
 			}
+			break;
 		case "despawn":
 			players.delete(message.messageBody);
 		// TODO!
@@ -98,18 +114,32 @@ function updateGame(message) {
 }
 
 async function createPlayer(messageBody) {
-	if (messageBody.entityType === "player") {
-		let texture = await PIXI.Assets.load("assets/bunny.png");
-		let sprite = players.get(messageBody.id);
+    if (messageBody.entityType === "player") {
+        let texture = await PIXI.Assets.load("assets/bunny.png");
+        let sprite = players.get(messageBody.id);
 
-		if (!sprite) {
-			sprite = new PIXI.Sprite(texture);
-			sprite.anchor.set(0.5);
-			app.stage.addChild(sprite);
-		}
+        if (!sprite) {
+            sprite = new PIXI.Container();
+			sprite.zIndex = 1;
 
-		sprite.x = messageBody.posX * 50;
-		sprite.y = messageBody.posY * 50;
-		players.set(messageBody.id, sprite);
-	}
+            let playerSprite = new PIXI.Sprite(texture);
+            playerSprite.anchor.set(0.5);
+            sprite.addChild(playerSprite);
+
+            let healthBar = new PIXI.Graphics();
+            healthBar.beginFill(0xFF0000);
+            healthBar.drawRect(-25, -40, 50, 5);
+            healthBar.endFill();
+            sprite.addChild(healthBar);
+
+            sprite.playerSprite = playerSprite;
+            sprite.healthBar = healthBar;
+
+            app.stage.addChild(sprite);
+        }
+
+        sprite.x = messageBody.posX * 50;
+        sprite.y = messageBody.posY * 50;
+        players.set(messageBody.id, sprite);
+    }
 }
