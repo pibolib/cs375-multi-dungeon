@@ -64,7 +64,10 @@ server.listen(port, hostname, () => {
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (client, req) => {
 	console.log("New client connected!");
-	let authToken = req.headers.cookie?.split(";").find((data) => data.startsWith("authToken="))?.split("=")[1];
+	let authToken = req.headers.cookie
+		?.split(";")
+		.find((data) => data.startsWith("authToken="))
+		?.split("=")[1];
 	let username = tokenStorage[authToken];
 
 	// Send current entities to the new client
@@ -86,7 +89,13 @@ wss.on("connection", (client, req) => {
 			entityType: "player",
 			posX: Math.floor(Math.random() * 8),
 			posY: Math.floor(Math.random() * 8),
-			id: username // Use the username as the id
+			hp: 10,
+			mhp: 10,
+			xp: 0,
+			mxp: 10,
+			str: 2,
+			lvl: 1,
+			id: username, // Use the username as the id
 		};
 		let newEntityMessage = {
 			messageType: "spawn",
@@ -107,9 +116,9 @@ wss.on("connection", (client, req) => {
 			if (messageObject.messageType == "chat") {
 				// adding client id
 				let messageText = messageObject.messageBody;
-			    messageObject.messageBody = {
+				messageObject.messageBody = {
 					id: clientData.id,
-					text: messageText
+					text: messageText,
 				};
 				broadcast(JSON.stringify(messageObject));
 			} else if (clientData) {
@@ -144,7 +153,7 @@ wss.on("connection", (client, req) => {
 			};
 
 			updateEvents.push(JSON.stringify(despawnMessage));
-			 entities.delete(clientData.id); // Remove entity from the Map
+			entities.delete(clientData.id); // Remove entity from the Map
 		}
 	});
 });
@@ -164,25 +173,93 @@ function handleCycle() {
 		if (!clientData || !entities.has(clientData.id)) {
 			continue;
 		}
-		
+
 		let entity = entities.get(clientData.id);
 		let didAction = false;
 
 		switch (clientData.action) {
 			case "moveLeft":
-				entity.posX -= 1;
+				if (
+					entityAtPosition(
+						entity.posX - 1,
+						entity.posY,
+						clientData.id
+					)
+				) {
+					damageEntity(
+						clientData.id,
+						entityAtPosition(
+							entity.posX - 1,
+							entity.posY,
+							clientData.id
+						)
+					);
+				} else {
+					entity.posX -= 1;
+				}
 				didAction = true;
 				break;
 			case "moveRight":
-				entity.posX += 1;
+				if (
+					entityAtPosition(
+						entity.posX + 1,
+						entity.posY,
+						clientData.id
+					)
+				) {
+					damageEntity(
+						clientData.id,
+						entityAtPosition(
+							entity.posX + 1,
+							entity.posY,
+							clientData.id
+						)
+					);
+				} else {
+					entity.posX += 1;
+				}
 				didAction = true;
 				break;
 			case "moveUp":
-				entity.posY -= 1;
+				if (
+					entityAtPosition(
+						entity.posX,
+						entity.posY - 1,
+						clientData.id
+					)
+				) {
+					damageEntity(
+						clientData.id,
+						entityAtPosition(
+							entity.posX,
+							entity.posY - 1,
+							clientData.id
+						)
+					);
+				} else {
+					entity.posY -= 1;
+				}
 				didAction = true;
 				break;
 			case "moveDown":
-				entity.posY += 1;
+				if (
+					entityAtPosition(
+						entity.posX,
+						entity.posY + 1,
+						clientData.id
+					)
+				) {
+					damageEntity(
+						clientData.id,
+						entityAtPosition(
+							entity.posX,
+							entity.posY + 1,
+							clientData.id
+						)
+					);
+				} else {
+					entity.posY += 1;
+				}
 				didAction = true;
 				break;
 		}
@@ -202,6 +279,81 @@ function handleCycle() {
 		broadcast(updateEvents[i]);
 	}
 	updateEvents = [];
+}
+
+function entityAtPosition(x, y, callerId) {
+	for (entity of entities) {
+		if (entity[0] == callerId) {
+			continue;
+		}
+		if (entity[1].posX != x || entity[1].posY != y) {
+			continue;
+		}
+		return entity[0];
+	}
+	return false;
+}
+
+function damageEntity(callerId, targetId) {
+	let caller = entities.get(callerId);
+	let target = entities.get(targetId);
+	target.hp -= caller.str;
+	caller.xp += caller.str;
+	broadcast(
+		JSON.stringify({
+			messageType: "chat",
+			messageBody: {
+				id: "Server",
+				text: `${callerId} deals ${caller.str} damage to ${targetId}!`,
+			},
+		})
+	);
+	if (target.hp <= 0) {
+		target.posX = Math.floor(Math.random() * 8);
+		target.posY = Math.floor(Math.random() * 8);
+		target.hp = target.mhp;
+		broadcast(
+			JSON.stringify({
+				messageType: "chat",
+				messageBody: { id: "Server", text: `${targetId} has died!` },
+			})
+		);
+	}
+	let updateEvent = {
+		messageType: "updateStatus",
+		messageBody: {
+			actor: targetId,
+			newState: target,
+		},
+	};
+	updateEvents.push(JSON.stringify(updateEvent));
+	if (caller.xp >= caller.mxp) {
+		broadcast(
+			JSON.stringify({
+				messageType: "chat",
+				messageBody: {
+					id: "Server",
+					text: `${callerId} levels up! (${caller.lvl} -> ${
+						caller.lvl + 1
+					})`,
+				},
+			})
+		);
+		caller.xp -= caller.mxp;
+		caller.mxp = Math.floor(caller.mxp * 1.2);
+		caller.str += 1;
+		caller.lvl += 1;
+		caller.mhp += 2;
+		caller.hp = caller.mhp;
+		let updateEventCaller = {
+			messageType: "updateStatus",
+			messageBody: {
+				actor: callerId,
+				newState: caller,
+			},
+		};
+		updateEvents.push(JSON.stringify(updateEventCaller));
+	}
 }
 
 setInterval(handleCycle, 100);
