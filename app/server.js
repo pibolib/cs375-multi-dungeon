@@ -35,8 +35,21 @@ let updateEvents = [];
 // Clients map
 let clients = new Map();
 
+let rooms = {
+	room1: {
+		messages: [],
+		entities: []
+	},
+	room2: {
+		messages: [],
+		entities: []
+	}
+};
+
 // Storing room messages
 let roomMessages = {};
+
+const defaultRoom = "room1";
 
 // tells you how each room are connected with each other
 const MAP = {
@@ -89,13 +102,6 @@ wss.on("connection", (client, req) => {
 		?.split("=")[1];
 	let username = tokenStorage[authToken];
 
-	// Send current entities to the new client
-	let clientUpdateMessage = {
-		messageType: "refresh",
-		messageBody: Array.from(entities.values()), // Convert Map values to array
-	};
-	client.send(JSON.stringify(clientUpdateMessage));
-
 	// Check if the player already exists
 	if (entities.has(username)) {
 		// Update the existing entity
@@ -115,7 +121,7 @@ wss.on("connection", (client, req) => {
 			str: 2,
 			lvl: 1,
 			id: username, // Use the username as the id,
-			room: "room1"
+			room: defaultRoom
 		};
 		let newEntityMessage = {
 			messageType: "spawn",
@@ -123,20 +129,27 @@ wss.on("connection", (client, req) => {
 		};
 		clients.set(client, { id: username, action: "none" });
 		entities.set(username, newEntity); // Add new entity to the Map
+		rooms[defaultRoom].entities.push(newEntity);
 
 		updateEvents.push(JSON.stringify(newEntityMessage));
 	}
+
+	// getting the entity
+	let entity = entities.get(username);
+	refresh(entity, client);
 
 	// Handle messages from the client
 	client.on("message", (message) => {
 		try {
 			let messageObject = JSON.parse(message);
 			let clientData = clients.get(client);
+			console.log("Received message:", messageObject);
 
 			if (messageObject.messageType == "chat") {
 				// adding client id
-				let messageText = clientData.id + messageObject.messageBody.text;
+				let messageText = `${clientData.id}: ${messageObject.messageBody.text}`;
 				messageObject.messageBody = {
+					room: messageObject.messageBody.room,
 					text: messageText
 				};
 
@@ -147,7 +160,21 @@ wss.on("connection", (client, req) => {
 				roomMessages[messageObject.messageBody.room].push(messageText);
 
 				broadcast(JSON.stringify(messageObject));
-			} else if (clientData) {
+			} 
+			else if (messageObject.messageType == "getRoomMessages") {
+				let room = messageObject.messageBody.room;
+				let messages = roomMessages[room] || [];
+				messageObject = {
+					messageType: "roomMessages",
+					messageBody: messages
+				};
+				client.send(JSON.stringify(messageObject));
+			}
+			else if (messageObject.messageType == "refresh") {
+				let entity = entities.get(clientData.id);
+				refresh(entity, client);
+			}
+			else if (clientData) {
 				let isValidAction = false;
 				switch (messageObject.messageType) {
 					case "moveLeft":
@@ -193,6 +220,15 @@ wss.on("connection", (client, req) => {
 		}
 	});
 });
+
+function refresh(entity, client) {
+	let refreshMessage = {
+		messageType: "refresh",
+		messageBody: rooms[entity.room]?.entities || [],
+	};
+
+	client.send(JSON.stringify(refreshMessage));
+}
 
 // Sends message to every client that is currently active
 function broadcast(message) {
@@ -352,8 +388,17 @@ function checkIfPlayerInNewRoom(entity, appWidth, appHeight) {
 	}
 
 	if (newRoomDirection) {
+		// removing entity from rooms entities list
+		let roomEntities = rooms[entity.room].entities;
+		let index = roomEntities.findIndex((e) => e.id == entity.id);
+		roomEntities.splice(index, 1);
+
 		let newRoom = MAP[entity.room][newRoomDirection];
 		entity.room = newRoom;
+
+		// adding entity to new room entities list
+		rooms[newRoom].entities.push(entity);
+
 		console.log("Player has entered a new room!", newRoom);
 	}
 }

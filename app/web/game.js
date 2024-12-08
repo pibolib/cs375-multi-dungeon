@@ -48,17 +48,6 @@ async function setUp() {
 		}
 	});
 
-	// Chat
-	button.addEventListener("click", (event) => {
-		event.preventDefault();
-		let message = {
-			messageType: "chat",
-			messageBody: messageInput.value,
-		};
-		ws.send(JSON.stringify(message));
-		messageInput.value = "";
-	});
-
 	let backgroundSprite = new PIXI.Sprite(await bgTexture);
 	bgTexture.zIndex = 0;
 	app.stage.addChild(backgroundSprite);
@@ -66,12 +55,6 @@ async function setUp() {
 	rightTexture = await PIXI.Assets.load("assets/right.png");
 	upTexture = await PIXI.Assets.load("assets/up.png");
 	downTexture = await PIXI.Assets.load("assets/down.png");
-	// adding tiles
-	// const tileTexture = await PIXI.Assets.load("assets/dungeon_tile.png");
-	// tileTexture.zIndex = 0;
-	// const tilingSprite = new PIXI.TilingSprite(tileTexture, app.screen.width, app.screen.height);
-	// tilingSprite.zIndex = 0;
-	// app.stage.addChild(tilingSprite);
 
 	// Sending an update to the server when an arrow key is pressed
 	document.addEventListener("keydown", (event) => {
@@ -103,17 +86,10 @@ async function setUp() {
 		}
 	});
 
-	ws.addEventListener("message", (event) => {
-		let message = JSON.parse(event.data);
-		if (message != null) {
-			console.log(message);
-			updateGame(message);
-		}
-	});
-
 	// Chat
 	button.addEventListener("click", (event) => {
 		event.preventDefault();
+		console.log(messageInput.value);
 		let message = {
 			messageType: "chat",
 			messageBody: {
@@ -126,7 +102,7 @@ async function setUp() {
 	});
 }
 
-function updateGame(message) {
+async function updateGame(message) {
 	switch (message.messageType) {
 		case "chat":
 			updateChat(message.messageBody);
@@ -173,6 +149,10 @@ function updateGame(message) {
 			break;
 		case "despawn":
 			players.delete(message.messageBody);
+			break;
+		case "roomMessages":
+			displayRoomMessages(message.messageBody);
+			break;
 		// TODO!
 	}
 }
@@ -232,11 +212,34 @@ function changeRoom(newRoom) {
 	if (rooms[newRoom]) {
 		currentRoom = newRoom;
 		app.renderer.background.color = rooms[newRoom].backgroundColor;
-		displayMessages();
+		let roomMessages = {
+			messageType: "getRoomMessages",
+			messageBody: {
+				room: newRoom
+			}
+		};
+		
+		let refresh = {
+			messageType: "refresh",
+			messageBody: []
+		}
+		ws.send(JSON.stringify(refresh));
+		ws.send(JSON.stringify(roomMessages));
 	}
 }
 
-function displayMessages() {
+function displayRoomMessages(messageBody) {
+	// removing existing chat messages
+	messageDisplay.textContent = "";
+
+
+	// adding existing chat messages
+	for (let chatMessage of messageBody) {
+		let newMessage = document.createElement("div");
+		newMessage.textContent = chatMessage;
+		messageDisplay.append(newMessage);
+	}
+
 	let message = document.createElement("div");
 	message.textContent = `You have entered ${currentRoom}`;
 	messageDisplay.append(message);
