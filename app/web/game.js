@@ -7,6 +7,21 @@ const messageDisplay = document.getElementById("messageDisplay");
 const messageInput = document.getElementById("message");
 const button = document.getElementById("submit");
 
+// Room attributes
+const rooms = {
+	room1: {
+		background: "assets/room1.png",
+		backgroundColor: "#1099bb"
+	},
+	room2: {
+		background: "assets/room2.png",
+		backgroundColor: "#ffffff"
+	}
+}
+
+// Room 1 is default
+let currentRoom = "room1";
+
 app.init({
 	backgroundColor: "#1099bb",
 	width: window.innerWidth,
@@ -49,6 +64,11 @@ async function setUp() {
 				break;
 		}
 
+		// adding the app width and height to the message
+		message.app = {};
+		message.app.width = app.screen.width;
+		message.app.height = app.screen.height;
+
 		if (message.hasOwnProperty("messageType")) {
 			ws.send(JSON.stringify(message));
 		}
@@ -67,7 +87,10 @@ async function setUp() {
 		event.preventDefault();
 		let message = {
 			messageType: "chat",
-			messageBody: messageInput.value,
+			messageBody: {
+				text: messageInput.value,
+				room: currentRoom,	
+			}
 		};
 		ws.send(JSON.stringify(message));
 		messageInput.value = "";
@@ -77,11 +100,8 @@ async function setUp() {
 function updateGame(message) {
 	switch (message.messageType) {
 		case "chat":
-			let newMessage = document.createElement("div");
-			let messageText =
-				message.messageBody.id + ": " + message.messageBody.text;
-			newMessage.textContent = messageText;
-			messageDisplay.append(newMessage);
+			updateChat(message.messageBody);
+			break;
 		case "spawn":
 			createPlayer(message.messageBody);
 			break;
@@ -91,7 +111,11 @@ function updateGame(message) {
 			if (player != null) {
 				player.x = newState.posX * 50;
 				player.y = newState.posY * 50;
-		
+				
+				if (newState.room !== currentRoom) {
+					changeRoom(newState.room);
+				}
+
 				// updating the health bar
 				let healthBarPercentage = newState.hp / newState.mhp;
 				player.healthBar.width = 50 * healthBarPercentage;
@@ -154,4 +178,26 @@ async function createPlayer(messageBody) {
         sprite.y = messageBody.posY * 50;
         players.set(messageBody.id, sprite);
     }
+}
+
+function updateChat(messageBody) {
+	if (messageBody.room === currentRoom) {
+		let newMessage = document.createElement("div");
+		newMessage.textContent =  messageBody.text;
+		messageDisplay.append(newMessage);
+	}
+}
+
+function changeRoom(newRoom) {
+	if (rooms[newRoom]) {
+		currentRoom = newRoom;
+		app.renderer.background.color = rooms[newRoom].backgroundColor;
+		displayMessages();
+	}
+}
+
+function displayMessages() {
+	let message = document.createElement("div");
+	message.textContent = `You have entered ${currentRoom}`;
+	messageDisplay.append(message);
 }

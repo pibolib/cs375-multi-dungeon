@@ -35,6 +35,25 @@ let updateEvents = [];
 // Clients map
 let clients = new Map();
 
+// Storing room messages
+let roomMessages = {};
+
+// tells you how each room are connected with each other
+const MAP = {
+	room1: {
+		North: "room2",
+		South: "room2",
+		East: "room2",
+		West: "room2",
+	},
+	room2: {
+		North: "room1",
+		South: "room1",
+		East: "room1",
+		West: "room1",
+	},
+}
+
 // redirecting users to login.html as the base landing page
 app.get("/", (req, res) => {
 	return res.sendFile(__dirname + "/web/login.html");
@@ -95,7 +114,8 @@ wss.on("connection", (client, req) => {
 			mxp: 10,
 			str: 2,
 			lvl: 1,
-			id: username, // Use the username as the id
+			id: username, // Use the username as the id,
+			room: "room1"
 		};
 		let newEntityMessage = {
 			messageType: "spawn",
@@ -115,27 +135,43 @@ wss.on("connection", (client, req) => {
 
 			if (messageObject.messageType == "chat") {
 				// adding client id
-				let messageText = messageObject.messageBody;
+				let messageText = clientData.id + messageObject.messageBody.text;
 				messageObject.messageBody = {
-					id: clientData.id,
-					text: messageText,
+					text: messageText
 				};
+
+				// adding to room messages
+				if (!roomMessages[messageObject.messageBody.room]) {
+					roomMessages[messageObject.messageBody.room] = [];
+				}
+				roomMessages[messageObject.messageBody.room].push(messageText);
+
 				broadcast(JSON.stringify(messageObject));
 			} else if (clientData) {
+				let isValidAction = false;
 				switch (messageObject.messageType) {
 					case "moveLeft":
 						clientData.action = "moveLeft";
+						isValidAction = true;
 						break;
 					case "moveRight":
 						clientData.action = "moveRight";
+						isValidAction = true;
 						break;
 					case "moveUp":
 						clientData.action = "moveUp";
+						isValidAction = true;
 						break;
 					case "moveDown":
 						clientData.action = "moveDown";
+						isValidAction = true;
 						break;
 				}
+				
+				if (isValidAction) {
+					clientData.app = messageObject.app;
+				}
+
 				console.log(`Client ${client} action: ${clientData.action}`);
 			}
 		} catch (error) {
@@ -263,8 +299,12 @@ function handleCycle() {
 				didAction = true;
 				break;
 		}
+
 		clientData.action = "none";
 		if (didAction) {
+				// checking if player entered a new room
+			checkIfPlayerInNewRoom(entity, clientData.app.width, clientData.app.height);
+
 			let actionEvent = {
 				messageType: "updateStatus",
 				messageBody: {
@@ -279,6 +319,43 @@ function handleCycle() {
 		broadcast(updateEvents[i]);
 	}
 	updateEvents = [];
+}
+
+function checkIfPlayerInNewRoom(entity, appWidth, appHeight) {
+	// offseting by factor of 50 to match the scaling of how we send the player position on key movement
+	appWidth = appWidth / 50;
+	appHeight = appHeight / 50;
+
+	let newRoomDirection = undefined;
+
+	// Check if the player has reached the edge of the screen
+	if (entity.posX < 0 || entity.posX > appWidth || entity.posY < 0 || entity.posY > appHeight) {
+		// Reset player position to the opposite edge of the new room
+		if (entity.posX < 0) {
+			entity.posX = appWidth;
+			newRoomDirection = "West";
+		}
+		else if (entity.posX > appWidth) {
+			entity.posX = 0;
+			newRoomDirection = "East";
+		}
+
+		if (entity.posY < 0) {
+			entity.posY = appHeight;
+			newRoomDirection = "North";
+		}
+		
+		else if (entity.posY > appHeight) {
+			entity.posY = 0;
+			newRoomDirection = "South";
+		}
+	}
+
+	if (newRoomDirection) {
+		let newRoom = MAP[entity.room][newRoomDirection];
+		entity.room = newRoom;
+		console.log("Player has entered a new room!", newRoom);
+	}
 }
 
 function entityAtPosition(x, y, callerId) {
