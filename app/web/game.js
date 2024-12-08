@@ -7,6 +7,9 @@ const messageDisplay = document.getElementById("messageDisplay");
 const messageInput = document.getElementById("message");
 const button = document.getElementById("submit");
 
+const bgTexture = PIXI.Assets.load("assets/background.png");
+let leftTexture, rightTexture, downTexture, upTexture;
+
 // Room attributes
 const rooms = {
 	room1: {
@@ -37,6 +40,32 @@ window.addEventListener("resize", () => {
 });
 
 async function setUp() {
+	ws.addEventListener("message", async (event) => {
+		let message = JSON.parse(event.data);
+		if (message != null) {
+			console.log(message);
+			await updateGame(message);
+		}
+	});
+
+	// Chat
+	button.addEventListener("click", (event) => {
+		event.preventDefault();
+		let message = {
+			messageType: "chat",
+			messageBody: messageInput.value,
+		};
+		ws.send(JSON.stringify(message));
+		messageInput.value = "";
+	});
+
+	let backgroundSprite = new PIXI.Sprite(await bgTexture);
+	bgTexture.zIndex = 0;
+	app.stage.addChild(backgroundSprite);
+	leftTexture = await PIXI.Assets.load("assets/left.png");
+	rightTexture = await PIXI.Assets.load("assets/right.png");
+	upTexture = await PIXI.Assets.load("assets/up.png");
+	downTexture = await PIXI.Assets.load("assets/down.png");
 	// adding tiles
 	// const tileTexture = await PIXI.Assets.load("assets/dungeon_tile.png");
 	// tileTexture.zIndex = 0;
@@ -109,6 +138,17 @@ function updateGame(message) {
 			let player = players.get(message.messageBody.actor);
 			let newState = message.messageBody.newState;
 			if (player != null) {
+				let dx = newState.posX - player.x / 50;
+				let dy = newState.posY - player.y / 50;
+				if (dx == -1) {
+					player.playerSprite.texture = leftTexture;
+				} else if (dx == 1) {
+					player.playerSprite.texture = rightTexture;
+				} else if (dy == -1) {
+					player.playerSprite.texture = upTexture;
+				} else if (dy == 1) {
+					player.playerSprite.texture = downTexture;
+				}
 				player.x = newState.posX * 50;
 				player.y = newState.posY * 50;
 				
@@ -138,46 +178,46 @@ function updateGame(message) {
 }
 
 async function createPlayer(messageBody) {
-    if (messageBody.entityType === "player") {
-        let texture = await PIXI.Assets.load("assets/bunny.png");
-        let sprite = players.get(messageBody.id);
+	if (messageBody.entityType === "player") {
+		let texture = await PIXI.Assets.load("assets/down.png");
+		let sprite = players.get(messageBody.id);
 
-        if (!sprite) {
-            sprite = new PIXI.Container();
+		if (!sprite) {
+			sprite = new PIXI.Container();
 			sprite.zIndex = 1;
 
-            let playerSprite = new PIXI.Sprite(texture);
-            playerSprite.anchor.set(0.5);
-            sprite.addChild(playerSprite);
+			let playerSprite = new PIXI.Sprite(texture);
+			playerSprite.anchor.set(0.5);
+			sprite.addChild(playerSprite);
 
 			// health bar
-            let healthBar = new PIXI.Graphics();
-            healthBar.beginFill(0xFF0000);
-            healthBar.drawRect(-25, -40, 50, 5);
-            healthBar.endFill();
-            sprite.addChild(healthBar);
-			
+			let healthBar = new PIXI.Graphics();
+			healthBar.beginFill(0xff0000);
+			healthBar.drawRect(-25, -40, 50, 5);
+			healthBar.endFill();
+			sprite.addChild(healthBar);
+
 			// username on top
 			let usernameText = new PIXI.Text(messageBody.id, {
-                fontFamily: 'Arial',
-                fontSize: 16,
-                fill: 0xffffff,
-                align: 'center'
-            });
-            usernameText.anchor.set(0.5);
-            usernameText.position.set(0, -50); // Position above the health bar
-            sprite.addChild(usernameText);
+				fontFamily: "Arial",
+				fontSize: 16,
+				fill: 0xffffff,
+				align: "center",
+			});
+			usernameText.anchor.set(0.5);
+			usernameText.position.set(0, -50); // Position above the health bar
+			sprite.addChild(usernameText);
 
-            sprite.playerSprite = playerSprite;
-            sprite.healthBar = healthBar;
+			sprite.playerSprite = playerSprite;
+			sprite.healthBar = healthBar;
 
-            app.stage.addChild(sprite);
-        }
+			app.stage.addChild(sprite);
+		}
 
-        sprite.x = messageBody.posX * 50;
-        sprite.y = messageBody.posY * 50;
-        players.set(messageBody.id, sprite);
-    }
+		sprite.x = messageBody.posX * 50;
+		sprite.y = messageBody.posY * 50;
+		players.set(messageBody.id, sprite);
+	}
 }
 
 function updateChat(messageBody) {
