@@ -126,11 +126,23 @@ async function createPlayer(messageBody) {
             playerSprite.anchor.set(0.5);
             sprite.addChild(playerSprite);
 
+			// health bar
             let healthBar = new PIXI.Graphics();
             healthBar.beginFill(0xFF0000);
             healthBar.drawRect(-25, -40, 50, 5);
             healthBar.endFill();
             sprite.addChild(healthBar);
+			
+			// username on top
+			let usernameText = new PIXI.Text(messageBody.id, {
+                fontFamily: 'Arial',
+                fontSize: 16,
+                fill: 0xffffff,
+                align: 'center'
+            });
+            usernameText.anchor.set(0.5);
+            usernameText.position.set(0, -50); // Position above the health bar
+            sprite.addChild(usernameText);
 
             sprite.playerSprite = playerSprite;
             sprite.healthBar = healthBar;
