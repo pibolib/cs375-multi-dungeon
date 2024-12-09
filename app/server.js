@@ -29,25 +29,27 @@ pool.connect().then(() => {
 // Entities in the game world
 let entities = new Map();
 
-// Queue of update events
-let updateEvents = [];
-
 // Clients map
 let clients = new Map();
 
 let rooms = {
 	room1: {
 		messages: [],
-		entities: []
+		entities: [],
+		clients: [],
+		backgroundColor: "#1099bb",
+		updateEvents: [],
+		clientsNeedRefresh: false
 	},
 	room2: {
 		messages: [],
-		entities: []
+		entities: [],
+		clients: [],
+		backgroundColor: "#000111",
+		updateEvents: [],
+		clientsNeedRefresh: false
 	}
 };
-
-// Storing room messages
-let roomMessages = {};
 
 const defaultRoom = "room1";
 
@@ -129,9 +131,12 @@ wss.on("connection", (client, req) => {
 		};
 		clients.set(client, { id: username, action: "none" });
 		entities.set(username, newEntity); // Add new entity to the Map
-		rooms[defaultRoom].entities.push(newEntity);
 
-		updateEvents.push(JSON.stringify(newEntityMessage));
+		// adding entity and  client to the room
+		rooms[defaultRoom].entities.push(newEntity);
+		rooms[defaultRoom].clients.push(client);
+
+		rooms[defaultRoom].updateEvents.push(JSON.stringify(newEntityMessage));
 	}
 
 	// getting the entity
@@ -143,23 +148,19 @@ wss.on("connection", (client, req) => {
 		try {
 			let messageObject = JSON.parse(message);
 			let clientData = clients.get(client);
-			console.log("Received message:", messageObject);
+			let entity = entities.get(clientData.id);
+			let room = rooms[entity.room];
 
 			if (messageObject.messageType == "chat") {
 				// adding client id
 				let messageText = `${clientData.id}: ${messageObject.messageBody.text}`;
 				messageObject.messageBody = {
-					room: messageObject.messageBody.room,
 					text: messageText
 				};
 
-				// adding to room messages
-				if (!roomMessages[messageObject.messageBody.room]) {
-					roomMessages[messageObject.messageBody.room] = [];
-				}
-				roomMessages[messageObject.messageBody.room].push(messageText);
+				rooms[entity.room].messages.push(messageText);
 
-				broadcast(JSON.stringify(messageObject));
+				broadcast(JSON.stringify(messageObject), room);
 			} 
 			else if (messageObject.messageType == "getRoomMessages") {
 				let room = messageObject.messageBody.room;
@@ -198,8 +199,6 @@ wss.on("connection", (client, req) => {
 				if (isValidAction) {
 					clientData.app = messageObject.app;
 				}
-
-				console.log(`Client ${client} action: ${clientData.action}`);
 			}
 		} catch (error) {
 			console.error("Error processing message:", error);
@@ -210,12 +209,20 @@ wss.on("connection", (client, req) => {
 		let clientData = clients.get(client);
 
 		if (clientData) {
+			let entity = entities.get(clientData.id);
+			let room = rooms[entity.room];
+
 			let despawnMessage = {
 				messageType: "despawn",
 				messageBody: { id: clientData.id },
 			};
 
-			updateEvents.push(JSON.stringify(despawnMessage));
+			room.updateEvents.push(JSON.stringify(despawnMessage));
+			// remove client and entity
+			room.clients = room.clients.filter((c) => c != client);
+			room.entities = room.entities.filter((e) => e.id != clientData.id);
+			
+			clients.delete(client); // Remove client from the Map
 			entities.delete(clientData.id); // Remove entity from the Map
 		}
 	});
@@ -231,9 +238,8 @@ function refresh(entity, client) {
 }
 
 // Sends message to every client that is currently active
-function broadcast(message) {
-	console.log("Broadcasting message:", message);
-	for (let client of wss.clients) {
+function broadcast(message, room) {
+	for (let client of room.clients) {
 		if (client.readyState === ws.OPEN) {
 			client.send(message);
 		}
@@ -241,12 +247,14 @@ function broadcast(message) {
 }
 
 function handleCycle() {
-	for (let [, clientData] of clients.entries()) {
+	let room = rooms[defaultRoom];
+	for (let [client, clientData] of clients.entries()) {
 		if (!clientData || !entities.has(clientData.id)) {
 			continue;
 		}
 
 		let entity = entities.get(clientData.id);
+		room = rooms[entity.room];
 		let didAction = false;
 
 		switch (clientData.action) {
@@ -338,9 +346,6 @@ function handleCycle() {
 
 		clientData.action = "none";
 		if (didAction) {
-				// checking if player entered a new room
-			checkIfPlayerInNewRoom(entity, clientData.app.width, clientData.app.height);
-
 			let actionEvent = {
 				messageType: "updateStatus",
 				messageBody: {
@@ -348,16 +353,44 @@ function handleCycle() {
 					newState: entity,
 				},
 			};
-			updateEvents.push(JSON.stringify(actionEvent));
+
+			// checking if player entered a new room
+			if (checkIfPlayerInNewRoom(entity, client, clientData.app.width, clientData.app.height)) {
+				actionEvent.messageBody.newRoom = rooms[entity.room];
+
+				// updating the room
+				room = rooms[entity.room];
+			}
+
+			room.updateEvents.push(JSON.stringify(actionEvent));
 		}
 	}
-	for (let i = 0; i < updateEvents.length; i++) {
-		broadcast(updateEvents[i]);
+
+	// going through each room and broadcasting the update events
+	for (let roomName in rooms) {
+		let room = rooms[roomName];
+		broadcastUpdateEvents(room);
 	}
-	updateEvents = [];
 }
 
-function checkIfPlayerInNewRoom(entity, appWidth, appHeight) {
+function broadcastUpdateEvents(room) {
+	for (let i = 0; i < room.updateEvents.length; i++) {
+		broadcast(room.updateEvents[i], room);
+	}
+
+	// going through refresh
+	if (room.clientsNeedRefresh) {
+		for (let client of room.clients) {
+			let entity = entities.get(clients.get(client).id);
+			refresh(entity, client);
+		}
+		room.clientsNeedRefresh = false;
+	}
+	
+	room.updateEvents = [];
+}
+
+function checkIfPlayerInNewRoom(entity, client, appWidth, appHeight) {
 	// offseting by factor of 50 to match the scaling of how we send the player position on key movement
 	appWidth = appWidth / 50;
 	appHeight = appHeight / 50;
@@ -388,19 +421,34 @@ function checkIfPlayerInNewRoom(entity, appWidth, appHeight) {
 	}
 
 	if (newRoomDirection) {
+		console.log("old", rooms);
 		// removing entity from rooms entities list
-		let roomEntities = rooms[entity.room].entities;
+		let oldRoom = rooms[entity.room];
+		let roomEntities = oldRoom.entities;
 		let index = roomEntities.findIndex((e) => e.id == entity.id);
 		roomEntities.splice(index, 1);
+
+		// removing client from rooms clients list
+		let roomClients = oldRoom.clients;
+		let clientIndex = roomClients.findIndex((c) => c == client);
+		roomClients.splice(clientIndex, 1);
+
+		// needs refresh
+		oldRoom.clientsNeedRefresh = true;
 
 		let newRoom = MAP[entity.room][newRoomDirection];
 		entity.room = newRoom;
 
-		// adding entity to new room entities list
+		// adding entity and client to new room entities list
 		rooms[newRoom].entities.push(entity);
+		rooms[newRoom].clients.push(client);
+		rooms[newRoom].clientsNeedRefresh = true;
+		console.log("new", rooms);
 
-		console.log("Player has entered a new room!", newRoom);
+		return true;
 	}
+
+	return false;
 }
 
 function entityAtPosition(x, y, callerId) {
@@ -419,6 +467,7 @@ function entityAtPosition(x, y, callerId) {
 function damageEntity(callerId, targetId) {
 	let caller = entities.get(callerId);
 	let target = entities.get(targetId);
+	let room = rooms[caller.room];
 	target.hp -= caller.str;
 	caller.xp += caller.str;
 	broadcast(
@@ -428,7 +477,7 @@ function damageEntity(callerId, targetId) {
 				id: "Server",
 				text: `${callerId} deals ${caller.str} damage to ${targetId}!`,
 			},
-		})
+		}), room
 	);
 	if (target.hp <= 0) {
 		target.posX = Math.floor(Math.random() * 8);
@@ -438,7 +487,8 @@ function damageEntity(callerId, targetId) {
 			JSON.stringify({
 				messageType: "chat",
 				messageBody: { id: "Server", text: `${targetId} has died!` },
-			})
+			}), 
+			room
 		);
 	}
 	let updateEvent = {
@@ -448,7 +498,7 @@ function damageEntity(callerId, targetId) {
 			newState: target,
 		},
 	};
-	updateEvents.push(JSON.stringify(updateEvent));
+	room.updateEvents.push(JSON.stringify(updateEvent));
 	if (caller.xp >= caller.mxp) {
 		broadcast(
 			JSON.stringify({
@@ -459,7 +509,8 @@ function damageEntity(callerId, targetId) {
 						caller.lvl + 1
 					})`,
 				},
-			})
+			}),
+			room
 		);
 		caller.xp -= caller.mxp;
 		caller.mxp = Math.floor(caller.mxp * 1.2);
@@ -474,7 +525,7 @@ function damageEntity(callerId, targetId) {
 				newState: caller,
 			},
 		};
-		updateEvents.push(JSON.stringify(updateEventCaller));
+		room.updateEvents.push(JSON.stringify(updateEventCaller));
 	}
 }
 

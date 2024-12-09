@@ -14,16 +14,12 @@ let leftTexture, rightTexture, downTexture, upTexture;
 const rooms = {
 	room1: {
 		background: "assets/room1.png",
-		backgroundColor: "#1099bb"
 	},
 	room2: {
 		background: "assets/room2.png",
 		backgroundColor: "#ffffff"
 	}
 }
-
-// Room 1 is default
-let currentRoom = "room1";
 
 app.init({
 	backgroundColor: "#1099bb",
@@ -93,8 +89,7 @@ async function setUp() {
 		let message = {
 			messageType: "chat",
 			messageBody: {
-				text: messageInput.value,
-				room: currentRoom,	
+				text: messageInput.value
 			}
 		};
 		ws.send(JSON.stringify(message));
@@ -127,31 +122,22 @@ async function updateGame(message) {
 				}
 				player.x = newState.posX * 50;
 				player.y = newState.posY * 50;
-				
-				if (newState.room !== currentRoom) {
-					changeRoom(newState.room);
-				}
 
 				// updating the health bar
 				let healthBarPercentage = newState.hp / newState.mhp;
 				player.healthBar.width = 50 * healthBarPercentage;
+
+				// if the room has changed, we will update the entities and messages
+				if ("newRoom" in message.messageBody) {
+					changeRoom(message.messageBody.newRoom);
+				}
 			}
 			break;
 		case "refresh":
-			// Only remove player sprites, not the background
-			players.forEach((player) => {
-				app.stage.removeChild(player);
-			});
-			players.clear();
-			for (let newEntity of message.messageBody) {
-				createPlayer(newEntity);
-			}
+			refresh(message.messageBody);
 			break;
 		case "despawn":
 			players.delete(message.messageBody);
-			break;
-		case "roomMessages":
-			displayRoomMessages(message.messageBody);
 			break;
 		// TODO!
 	}
@@ -200,47 +186,42 @@ async function createPlayer(messageBody) {
 	}
 }
 
-function updateChat(messageBody) {
-	if (messageBody.room === currentRoom) {
-		let newMessage = document.createElement("div");
-		newMessage.textContent =  messageBody.text;
-		messageDisplay.append(newMessage);
+function refresh(entities) {
+	// Only remove player sprites, not the background
+	players.forEach((player) => {
+		app.stage.removeChild(player);
+	});
+	players.clear();
+	for (let newEntity of entities) {
+		createPlayer(newEntity);
 	}
+}
+
+function updateChat(messageBody) {
+	let newMessage = document.createElement("div");
+	newMessage.textContent =  messageBody.text;
+	messageDisplay.append(newMessage);
 }
 
 function changeRoom(newRoom) {
-	if (rooms[newRoom]) {
-		currentRoom = newRoom;
-		app.renderer.background.color = rooms[newRoom].backgroundColor;
-		let roomMessages = {
-			messageType: "getRoomMessages",
-			messageBody: {
-				room: newRoom
-			}
-		};
-		
-		let refresh = {
-			messageType: "refresh",
-			messageBody: []
-		}
-		ws.send(JSON.stringify(refresh));
-		ws.send(JSON.stringify(roomMessages));
-	}
+	app.renderer.background.color = newRoom.backgroundColor;
+	refresh(newRoom.entities);
+	displayRoomMessages(newRoom.messages);
 }
 
-function displayRoomMessages(messageBody) {
+function displayRoomMessages(messages) {
 	// removing existing chat messages
 	messageDisplay.textContent = "";
 
 
 	// adding existing chat messages
-	for (let chatMessage of messageBody) {
+	for (let chatMessage of messages) {
 		let newMessage = document.createElement("div");
 		newMessage.textContent = chatMessage;
 		messageDisplay.append(newMessage);
 	}
 
 	let message = document.createElement("div");
-	message.textContent = `You have entered ${currentRoom}`;
+	message.textContent = `You have entered ${room}`;
 	messageDisplay.append(message);
 }
