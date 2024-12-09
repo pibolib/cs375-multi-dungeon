@@ -38,17 +38,19 @@ let rooms = {
 		entities: [],
 		clients: [],
 		backgroundColor: "#1099bb",
+		backgroundTexture: "assets/background.png",
 		updateEvents: [],
-		clientsNeedRefresh: false
+		clientsNeedRefresh: false,
 	},
 	room2: {
 		messages: [],
 		entities: [],
 		clients: [],
 		backgroundColor: "#000111",
+		backgroundTexture: "assets/background2.png",
 		updateEvents: [],
-		clientsNeedRefresh: false
-	}
+		clientsNeedRefresh: false,
+	},
 };
 
 const defaultRoom = "room1";
@@ -67,7 +69,7 @@ const MAP = {
 		East: "room1",
 		West: "room1",
 	},
-}
+};
 
 // redirecting users to login.html as the base landing page
 app.get("/", (req, res) => {
@@ -123,7 +125,7 @@ wss.on("connection", (client, req) => {
 			str: 2,
 			lvl: 1,
 			id: username, // Use the username as the id,
-			room: defaultRoom
+			room: defaultRoom,
 		};
 		let newEntityMessage = {
 			messageType: "spawn",
@@ -155,27 +157,24 @@ wss.on("connection", (client, req) => {
 				// adding client id
 				let messageText = `${clientData.id}: ${messageObject.messageBody.text}`;
 				messageObject.messageBody = {
-					text: messageText
+					text: messageText,
 				};
 
 				rooms[entity.room].messages.push(messageText);
 
 				broadcast(JSON.stringify(messageObject), room);
-			} 
-			else if (messageObject.messageType == "getRoomMessages") {
+			} else if (messageObject.messageType == "getRoomMessages") {
 				let room = messageObject.messageBody.room;
 				let messages = roomMessages[room] || [];
 				messageObject = {
 					messageType: "roomMessages",
-					messageBody: messages
+					messageBody: messages,
 				};
 				client.send(JSON.stringify(messageObject));
-			}
-			else if (messageObject.messageType == "refresh") {
+			} else if (messageObject.messageType == "refresh") {
 				let entity = entities.get(clientData.id);
 				refresh(entity, client);
-			}
-			else if (clientData) {
+			} else if (clientData) {
 				let isValidAction = false;
 				switch (messageObject.messageType) {
 					case "moveLeft":
@@ -195,7 +194,7 @@ wss.on("connection", (client, req) => {
 						isValidAction = true;
 						break;
 				}
-				
+
 				if (isValidAction) {
 					clientData.app = messageObject.app;
 				}
@@ -221,7 +220,7 @@ wss.on("connection", (client, req) => {
 			// remove client and entity
 			room.clients = room.clients.filter((c) => c != client);
 			room.entities = room.entities.filter((e) => e.id != clientData.id);
-			
+
 			clients.delete(client); // Remove client from the Map
 			entities.delete(clientData.id); // Remove entity from the Map
 		}
@@ -355,7 +354,14 @@ function handleCycle() {
 			};
 
 			// checking if player entered a new room
-			if (checkIfPlayerInNewRoom(entity, client, clientData.app.width, clientData.app.height)) {
+			if (
+				checkIfPlayerInNewRoom(
+					entity,
+					client,
+					clientData.app.width,
+					clientData.app.height
+				)
+			) {
 				actionEvent.messageBody.newRoom = rooms[entity.room];
 
 				// updating the room
@@ -386,7 +392,7 @@ function broadcastUpdateEvents(room) {
 		}
 		room.clientsNeedRefresh = false;
 	}
-	
+
 	room.updateEvents = [];
 }
 
@@ -398,13 +404,17 @@ function checkIfPlayerInNewRoom(entity, client, appWidth, appHeight) {
 	let newRoomDirection = undefined;
 
 	// Check if the player has reached the edge of the screen
-	if (entity.posX < 0 || entity.posX > appWidth || entity.posY < 0 || entity.posY > appHeight) {
+	if (
+		entity.posX < 0 ||
+		entity.posX > appWidth ||
+		entity.posY < 0 ||
+		entity.posY > appHeight
+	) {
 		// Reset player position to the opposite edge of the new room
 		if (entity.posX < 0) {
 			entity.posX = appWidth;
 			newRoomDirection = "West";
-		}
-		else if (entity.posX > appWidth) {
+		} else if (entity.posX > appWidth) {
 			entity.posX = 0;
 			newRoomDirection = "East";
 		}
@@ -412,9 +422,7 @@ function checkIfPlayerInNewRoom(entity, client, appWidth, appHeight) {
 		if (entity.posY < 0) {
 			entity.posY = appHeight;
 			newRoomDirection = "North";
-		}
-		
-		else if (entity.posY > appHeight) {
+		} else if (entity.posY > appHeight) {
 			entity.posY = 0;
 			newRoomDirection = "South";
 		}
@@ -477,7 +485,8 @@ function damageEntity(callerId, targetId) {
 				id: "Server",
 				text: `${callerId} deals ${caller.str} damage to ${targetId}!`,
 			},
-		}), room
+		}),
+		room
 	);
 	if (target.hp <= 0) {
 		target.posX = Math.floor(Math.random() * 8);
@@ -487,7 +496,7 @@ function damageEntity(callerId, targetId) {
 			JSON.stringify({
 				messageType: "chat",
 				messageBody: { id: "Server", text: `${targetId} has died!` },
-			}), 
+			}),
 			room
 		);
 	}

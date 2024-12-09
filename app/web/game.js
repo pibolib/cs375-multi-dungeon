@@ -2,7 +2,7 @@ const ws = new WebSocket(`ws://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
-const GAME_WIDTH =  800;
+const GAME_WIDTH = 800;
 const GAME_HEIGHT = 800;
 
 // Chat attributes
@@ -12,6 +12,7 @@ const button = document.getElementById("submit");
 
 const bgTexture = PIXI.Assets.load("assets/background.png");
 let leftTexture, rightTexture, downTexture, upTexture;
+let backgroundSprite;
 
 // Room attributes
 const rooms = {
@@ -20,9 +21,9 @@ const rooms = {
 	},
 	room2: {
 		background: "assets/room2.png",
-		backgroundColor: "#ffffff"
-	}
-}
+		backgroundColor: "#ffffff",
+	},
+};
 
 app.init({
 	backgroundColor: "#1099bb",
@@ -47,7 +48,7 @@ async function setUp() {
 		}
 	});
 
-	let backgroundSprite = new PIXI.Sprite(await bgTexture);
+	backgroundSprite = new PIXI.Sprite(await bgTexture);
 	bgTexture.zIndex = 0;
 	app.stage.addChild(backgroundSprite);
 	leftTexture = await PIXI.Assets.load("assets/left.png");
@@ -92,8 +93,8 @@ async function setUp() {
 		let message = {
 			messageType: "chat",
 			messageBody: {
-				text: messageInput.value
-			}
+				text: messageInput.value,
+			},
 		};
 		ws.send(JSON.stringify(message));
 		messageInput.value = "";
@@ -202,12 +203,15 @@ function refresh(entities) {
 
 function updateChat(messageBody) {
 	let newMessage = document.createElement("div");
-	newMessage.textContent =  messageBody.text;
+	newMessage.textContent = messageBody.text;
 	messageDisplay.append(newMessage);
 }
 
-function changeRoom(newRoom) {
+async function changeRoom(newRoom) {
 	app.renderer.background.color = newRoom.backgroundColor;
+	backgroundSprite.texture = await PIXI.Assets.load(
+		newRoom.backgroundTexture
+	);
 	refresh(newRoom.entities);
 	displayRoomMessages(newRoom.messages);
 }
@@ -215,7 +219,6 @@ function changeRoom(newRoom) {
 function displayRoomMessages(messages) {
 	// removing existing chat messages
 	messageDisplay.textContent = "";
-
 
 	// adding existing chat messages
 	for (let chatMessage of messages) {
