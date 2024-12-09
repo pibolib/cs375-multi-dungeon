@@ -88,7 +88,7 @@ LoginLogout(app, pool, tokenStorage);
 
 // moved this below all the other route matching so that our predefined routes for files takes precedence
 // we need to have such override to add middleware authentication that only shows login and registration page when the user is not logged in already
-app.use(express.static("web"));
+app.use(express.static(__dirname + "/web/"));
 
 // Create HTTP server and attach the WebSocket server to it
 const server = http.createServer(app);
