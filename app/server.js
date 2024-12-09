@@ -14,7 +14,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-let port = 12789;
+let port = process.env.PORT || 12789;
 let hostname = "localhost";
 
 // global object for storing tokens
@@ -90,7 +90,7 @@ app.use(express.static("web"));
 
 // Create HTTP server and attach the WebSocket server to it
 const server = http.createServer(app);
-server.listen(port, hostname, () => {
+server.listen(port, () => {
 	console.log(`Server running on http://${hostname}:${port}`);
 });
 

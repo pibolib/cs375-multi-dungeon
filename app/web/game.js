@@ -2,7 +2,7 @@ const ws = new WebSocket(`ws://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
-const GAME_WIDTH = 800;
+const GAME_WIDTH =  800;
 const GAME_HEIGHT = 800;
 
 // Chat attributes
