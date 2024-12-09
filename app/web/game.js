@@ -2,6 +2,9 @@ const ws = new WebSocket(`ws://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 800;
+
 // Chat attributes
 const messageDisplay = document.getElementById("messageDisplay");
 const messageInput = document.getElementById("message");
@@ -74,8 +77,8 @@ async function setUp() {
 
 		// adding the app width and height to the message
 		message.app = {};
-		message.app.width = app.screen.width;
-		message.app.height = app.screen.height;
+		message.app.width = GAME_WIDTH;
+		message.app.height = GAME_HEIGHT;
 
 		if (message.hasOwnProperty("messageType")) {
 			ws.send(JSON.stringify(message));
