@@ -2,9 +2,28 @@
 
 Simple "real-time" multiplayer dungeon game made with HTML/CSS/JS.
 
+## Requirements
+<ul>
+  <li>Node.JS</li>
+  <li>PostgreSQL</li>
+  <li>PixiJS</li>
+  <li>WebSockets (ws library)</li>
+</ul>
+
 ## Setup
 
-Run `npm run setup`.
+### Installing Dependencies
+Run `npm install` to install all project dependencies.
+
+### Database Setup
+Run `npm run setup` to run the SQL script that setups up the database and the user table. After that, please create a new file called `env.json` at the root directory of the project. This file will contain all the credentials needed to access a PostgreSQL database from our code. Please define the following fields in the file:
+<ul>
+  <li>user</li>
+  <li>host</li>
+  <li>database</li>
+  <li>password</li>
+  <li>port</li>
+</ul>
 
 ## Running
 
