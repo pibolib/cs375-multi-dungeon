@@ -1,4 +1,4 @@
-const ws = new WebSocket(`ws://${window.document.location.host}`);
+const ws = new WebSocket(`wss://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
