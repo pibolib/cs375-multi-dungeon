@@ -4,15 +4,11 @@ Simple "real-time" multiplayer dungeon game made with HTML/CSS/JS.
 
 ## Setup
 
-Run `npm run install-deps`.
+Run `npm run setup`.
 
 ## Running
 
-Run `npm run start`.
-
-## Dependencies
-
-Currently using Node, Express JS, and Socket.IO.
+Run `npm run start`. Access locally through the link output into the console.
 
 ## Original Contract
 
