@@ -2,8 +2,8 @@ const ws = new WebSocket(`ws://${window.document.location.host}`);
 let players = new Map();
 const app = new PIXI.Application();
 
-const GAME_WIDTH = 800;
-const GAME_HEIGHT = 800;
+const GAME_WIDTH = 500;
+const GAME_HEIGHT = 500;
 
 // Chat attributes
 const messageDisplay = document.getElementById("messageDisplay");
@@ -26,9 +26,9 @@ const rooms = {
 };
 
 app.init({
-	backgroundColor: "#1099bb",
-	width: window.innerWidth,
-	height: window.innerHeight,
+	backgroundColor: "#87a96b",
+	width: GAME_WIDTH,
+	height: GAME_HEIGHT,
 }).then(async () => {
 	document.body.appendChild(app.view);
 	await setUp();
